@@ -1,6 +1,8 @@
 package aziz6292.studio.mad_a2_bcsf19a026_bcsf20a046
 
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
@@ -40,9 +42,15 @@ class MainActivity : AppCompatActivity() {
                 // Handle the update button click for the clicked contact
                 showUpdateContactDialog(clickedContact)
             },
-            deleteClickListener = { clickedContact ->
+            deleteClickListener = { clickedContact, _ ->
                 // Handle the delete button click for the clicked contact
                 showDeleteContactDialog(clickedContact)
+            },
+            callClickListener = { clickedContact ->
+                // Handle the call button click for the clicked contact
+                val phoneNumber = clickedContact.phoneNumber
+                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phoneNumber"))
+                startActivity(intent)
             }
         )
 
@@ -67,10 +75,16 @@ class MainActivity : AppCompatActivity() {
 
             override fun onQueryTextChange(newText: String?): Boolean {
                 // Perform search as the user types
-                newText?.let { searchContacts(it) }
+                if (newText.isNullOrBlank()) {
+                    // If the search query is empty, reload the original list of contacts
+                    loadContacts()
+                } else {
+                    newText?.let { searchContacts(it) }
+                }
                 return true
             }
         })
+
 
         loadContacts()
     }
@@ -196,7 +210,12 @@ class MainActivity : AppCompatActivity() {
             .setView(dialogView)
             .setPositiveButton("Delete") { _, _ ->
                 lifecycleScope.launch {
-                    deleteContact(contact)
+                    // Call the deleteContact function and pass a callback to handle UI updates
+                    deleteContact(contact) {
+                        // This block will be executed after the contact is deleted
+                        // Update your UI here, for example, by refreshing the contact list
+                        loadContacts()
+                    }
                 }
             }
             .setNegativeButton("Cancel", null)
@@ -205,13 +224,14 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    private fun deleteContact(contact: Contact) {
-        // Implement the logic to delete the contact
-        lifecycleScope.launch{
+    private suspend fun deleteContact(contact: Contact, onDeleteComplete: () -> Unit) {
+        // Delete the contact from the database
         contactRepository.deleteContact(contact)
-       }
-        loadContacts()
+
+        // Call the provided callback to handle UI updates
+        onDeleteComplete()
     }
+
 
     private fun searchContacts(query: String) {
         lifecycleScope.launch {
@@ -219,8 +239,22 @@ class MainActivity : AppCompatActivity() {
                 val contacts = withContext(Dispatchers.IO) {
                     contactRepository.searchContacts(query)
                 }
+
                 Log.d(TAG, "Search results: $contacts")
-                contactAdapter.submitList(contacts)
+
+                // Check if the query is empty, if so, load all contacts
+                if (query.isEmpty()) {
+                    loadContacts()
+                } else {
+                    // Filter the contacts based on partial matches in name or phone number
+                    val filteredContacts = contacts.filter {
+                        it.name.contains(query, true) || // Case-insensitive partial name match
+                                it.phoneNumber.contains(query) // Partial phone number match
+                    }
+
+                    // Update the adapter with the filtered list
+                    contactAdapter.submitList(filteredContacts)
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Error searching contacts: ${e.message}")
                 Toast.makeText(
@@ -231,6 +265,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
 
 
 

@@ -9,12 +9,13 @@ import aziz6292.studio.mad_a2_bcsf19a026_bcsf20a046.databinding.ItemContactBindi
 
 class ContactAdapter(
     private val updateClickListener: (Contact) -> Unit,
-    private val deleteClickListener: (Contact) -> Unit
+    private val deleteClickListener: (Contact, () -> Unit) -> Unit,
+    private val callClickListener: (Contact) -> Unit
 ) : ListAdapter<Contact, ContactAdapter.ContactViewHolder>(ContactDiffCallback()) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ContactViewHolder {
         val binding = ItemContactBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        return ContactViewHolder(binding, updateClickListener, deleteClickListener)
+        return ContactViewHolder(binding, this)
     }
 
     override fun onBindViewHolder(holder: ContactViewHolder, position: Int) {
@@ -24,8 +25,7 @@ class ContactAdapter(
 
     class ContactViewHolder(
         private val binding: ItemContactBinding,
-        private val updateClickListener: (Contact) -> Unit,
-        private val deleteClickListener: (Contact) -> Unit
+        private val adapter: ContactAdapter,
     ) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(contact: Contact) {
@@ -35,13 +35,26 @@ class ContactAdapter(
             // Set click listener for the update button
             binding.ivUpdate.setOnClickListener {
                 // Pass the clicked contact to the updateClickListener
-                updateClickListener(contact)
+                adapter.updateClickListener(contact)
             }
 
             // Set click listener for the delete button
             binding.ivDelete.setOnClickListener {
-                // Pass the clicked contact to the deleteClickListener
-                deleteClickListener(contact)
+                // Pass the clicked contact and a callback to the deleteClickListener
+                adapter.deleteClickListener(contact) {
+                    // This callback will be invoked after the deletion is confirmed
+                    // Update the UI or perform any other necessary tasks
+                    adapter.submitList(adapter.currentList.toMutableList().apply {
+                        // Remove the deleted contact from the list
+                        remove(contact)
+                    })
+                }
+            }
+
+            // Set click listener for the call button
+            binding.tvContactPhoneNumber.setOnClickListener {
+                // Pass the clicked contact to the callClickListener
+                adapter.callClickListener(contact)
             }
         }
     }
